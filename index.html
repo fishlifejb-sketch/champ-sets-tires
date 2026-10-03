@@ -70,8 +70,12 @@ aside.filters{display:flex;flex-direction:column;gap:18px;align-self:start;posit
 .filtToggle{display:none}
 
 .resultsHead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
-.count{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
-.count b{color:var(--ink)}
+.count{font-size:17px;color:var(--muted);font-variant-numeric:tabular-nums;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.count b{font-family:var(--f-display);font-size:28px;font-weight:700;line-height:1;color:var(--ink)}
+.fitjump{display:inline-flex;align-items:center;gap:7px;background:var(--chalk);color:var(--chalk-ink);border:none;border-radius:999px;padding:8px 16px;cursor:pointer;font-family:var(--f-display);font-size:clamp(15px,4.3vw,19px);white-space:nowrap;max-width:100%;font-weight:700;letter-spacing:.03em;text-transform:uppercase;line-height:1.1;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.fitjump b{font-size:1.2em;color:inherit}
+.fitjump:hover{filter:brightness(1.06)}
+.fitjump:active{transform:translateY(1px);box-shadow:none}
 .sortbox{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
 .sortbox select{width:auto;padding:6px 8px}
 
@@ -484,8 +488,8 @@ function render(resetScroll=true){
   const tires = res.reduce((s,x)=>s+x.avail,0);
   const atires = alts.reduce((s,x)=>s+x.avail,0);
   const altSizes = [...new Set(alts.map(x=>x.l.size))];
-  $('count').innerHTML = (res.length ? `<b>${res.length.toLocaleString()}</b> listings · <b>${tires.toLocaleString()}</b> tires` : (alts.length?'No exact matches':''))
-    + (alts.length ? ` · <button class="jump" type="button" data-act="toAlts">${alts.length.toLocaleString()} more in sizes that also fit</button>` : '');
+  $('count').innerHTML = `<span>${res.length ? `<b>${res.length.toLocaleString()}</b> listing${res.length===1?'':'s'} · <b>${tires.toLocaleString()}</b> tire${tires===1?'':'s'}` : (alts.length?'No exact matches':'')}</span>`
+    + (alts.length ? `<button class="fitjump" type="button" data-act="toAlts"><b>${alts.length.toLocaleString()}</b> more in sizes that also fit <span aria-hidden="true">↓</span></button>` : '');
   // exact matches
   const list=$('list');
   if(!res.length){
