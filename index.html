@@ -404,8 +404,8 @@ function dims(w,a,r){
   if(W>=100 && A>=25 && A<=95) return {d:R+2*W*A/100/25.4, wmm:W};      // metric: 225/65R17
   return null;
 }
-const FIT_PCT = 1.5;   // max difference in overall height, %
-const FIT_WMM = 30;    // max difference in tread width, mm
+const FIT_PCT = 2.75;  // max difference in overall height, % (taller or shorter)
+const FIT_WMM = Infinity; // no tread-width limit: every same-rim size within FIT_PCT shows
 // the exact size being looked for, when width, ratio and rim are all known
 function targetSize(sz){
   if(st.w && st.a && st.r) return {w:st.w,a:st.a,r:st.r};
