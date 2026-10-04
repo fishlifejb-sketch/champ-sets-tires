@@ -302,6 +302,8 @@ const SHOP = { phone: "919-498-4834", email: "ChampSetsNc@gmail.com", pickup: "1
   note: "Used tire sets, sold off the rim. Prices are per tire.",
   hours: [["Mon – Fri","7 AM – 5 PM"],["Saturday","8 AM – 3 PM"]], hoursNote: "Other meet times available on request.",
   policy: "3-day exchange on any tire that leaks.", service: "No mounting or balancing at this time.",
+  // Warehouse Pick List web app link (ends in /exec, no ?key). Tires already ordered are hidden from the site.
+  soldFeed: "",
  };
 // Orders from the checkout are sent to SHOP.email. Add SHOP.phone to also offer "Text order".
 
@@ -325,8 +327,11 @@ const money = v => v==null ? 'Call' : '$'+v.toFixed(2);
 const money0 = v => '$'+Math.round(v).toLocaleString();
 
 // header
+function stockLine(){
 const totalTires = L.reduce((s,l)=>s+l.qty,0);
-$('stock').innerHTML = `<b>${totalTires.toLocaleString()}</b> tires in stock · <b>${new Set(L.map(l=>l.size)).size}</b> sizes · <b>${new Set(L.map(l=>l.brand.toLowerCase())).size}</b> brands`;
+$('stock').innerHTML = `<b>${totalTires.toLocaleString()}</b> tires in stock · <b>${new Set(L.map(l=>l.size)).size}</b> sizes · <b>${new Set(L.filter(l=>l.qty>0).map(l=>l.brand.toLowerCase())).size}</b> brands`;
+}
+stockLine();
 { const map = 'https://maps.google.com/?q='+encodeURIComponent(SHOP.pickup);
   $('contact').innerHTML = SHOP.note + `<div class="info">
     <div><span class="k">Order</span><span>Call or text <a href="tel:${SHOP.phone.replace(/[^\d+]/g,'')}">${SHOP.phone}</a></span><span>Email <a href="mailto:${SHOP.email}">${SHOP.email}</a></span></div>
@@ -599,7 +604,7 @@ function textHref(){
   const sep=/iP(hone|ad|od)/.test(navigator.userAgent)?'&':'?';
   $('sendText').href=`sms:${SHOP.phone.replace(/[^\d+]/g,'')}${sep}body=${encodeURIComponent(orderText())}`;
 }
-function openCart(){ $('coDone').hidden=true; document.querySelector('.sendrow').hidden=false; drawCart(); $('co').hidden=false; document.body.style.overflow='hidden'; $('coErr').hidden=true; }
+function openCart(){ checkSold(); $('coDone').hidden=true; document.querySelector('.sendrow').hidden=false; drawCart(); $('co').hidden=false; document.body.style.overflow='hidden'; $('coErr').hidden=true; }
 function closeCart(){ $('co').hidden=true; document.body.style.overflow=''; }
 $('openCart').addEventListener('click',openCart);
 $('coClose').addEventListener('click',closeCart);
@@ -646,6 +651,44 @@ $('doneClose').addEventListener('click',()=>{ closeCart(); tray(); });
 // start on a realistic view: matched sets of 4, a popular size
 st.need=4;
 fillSizes(); sync(); render();
+
+// ---- Hide tires that were already ordered ----
+// The warehouse Pick List sheet publishes the serial numbers on orders (serials only, no customer details).
+// Deleting an order's rows from the Pick List puts those tires back on the site.
+const normSerial = v => String(v).replace(/\s+/g,'');
+function restat(l){
+  let qty=0,min=Infinity,max=0,maxT=0;
+  l.groups.forEach(([t,s])=>{qty+=s.length; if(t!=null&&t>maxT)maxT=t; s.forEach(([,p])=>{if(p!=null){min=Math.min(min,p);max=Math.max(max,p);}})});
+  Object.assign(l,{qty,min:isFinite(min)?min:null,max,maxT});
+}
+function applySold(list){
+  const sold=new Set((list||[]).map(normSerial)); if(!sold.size) return;
+  let changed=0, cartLost=0;
+  for(const l of L){
+    let hit=false;
+    const g=l.groups.map(([t,s])=>{ const keep=s.filter(p=>!sold.has(normSerial(p[0]))); if(keep.length!==s.length) hit=true; return [t,keep]; });
+    if(hit){ l.groups=g.filter(([,s])=>s.length); restat(l); changed++; }
+  }
+  if(!changed) return;
+  for(const [k,q] of [...quote]){
+    const [i,tr]=k.split('|'); const g=L[+i].groups.find(([gt])=>String(gt)===tr);
+    const have=g?g[1].length:0;
+    if(q>have){ cartLost+=q-have; if(have) quote.set(k,have); else quote.delete(k); }
+  }
+  stockLine(); fillSizes(); render(false); tray();
+  if(cartLost){
+    const msg=`Sorry, ${cartLost} tire${cartLost>1?'s':''} in your cart just sold and ${cartLost>1?'were':'was'} removed.`;
+    if(quote.size && !$('co').hidden && $('coDone').hidden){ $('coErr').textContent=msg; $('coErr').hidden=false; }
+    else alert(msg);
+  }
+}
+function checkSold(){
+  if(!SHOP.soldFeed) return;
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),8000);
+  fetch(SHOP.soldFeed+(SHOP.soldFeed.includes('?')?'&':'?')+'sold=1',{signal:ctl.signal,cache:'no-store'})
+    .then(r=>r.json()).then(d=>applySold(d&&d.sold)).catch(()=>{}).finally(()=>clearTimeout(t));
+}
+checkSold();
 </script>
 
 </body></html>
