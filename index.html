@@ -567,14 +567,14 @@ function tray(){
 }
 const sizeLine = x => `${x.l.size}${x.l.ls?' '+x.l.ls:''}`;
 const treadLine = x => x.t==null ? 'tread not listed' : `${x.t}/32 tread`;
-function orderText(){
+function orderText(shop){
   const lines=quoteLines(); const n=lines.reduce((s,x)=>s+x.q,0); const tot=lines.reduce((s,x)=>s+x.sum,0);
   const name=$('cName').value.trim(), phone=$('cPhone').value.trim(), note=$('cNote').value.trim();
   return [`NEW TIRE ORDER`, ``, `Name: ${name}`, `Phone: ${phone}`, note?`Note: ${note}`:null, ``,
     ...lines.flatMap((x,i)=>[
       `${i+1}) ${x.q} x ${x.l.brand} ${x.l.model}`,
       `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}`,
-      `   Serial #s: ${x.picks.map(p=>p[0].replace(/\s+/g,'')).join(', ')}`, ``]),
+      `   Serial #s: ${x.picks.map(p=>p[0].replace(/\s+/g,'')+(shop&&p[2]?` (Bay NC-${p[2]})`:'')).join(', ')}`, ``]),
     `TOTAL: ${n} tire${n>1?'s':''}, ${money(tot)} before tax`, SHOP.pickup?`Pickup: ${SHOP.pickup}`:null].filter(v=>v!==null).join('\n');
 }
 // one entry per tire, for the warehouse pick list (Google Sheet fed by Netlify's webhook)
@@ -628,7 +628,7 @@ $('sendOrder').addEventListener('click',async()=>{
   const b=$('sendOrder'); b.disabled=true; b.textContent='Sending…';
   const lines=quoteLines(), n=lines.reduce((s,x)=>s+x.q,0), tot=lines.reduce((s,x)=>s+x.sum,0);
   const body=new URLSearchParams({'form-name':'order', name:$('cName').value.trim(), phone:$('cPhone').value.trim(),
-    note:$('cNote').value.trim(), tires:`${n} tire${n>1?'s':''}`, total:money(tot), order:orderText(), picklist:pickList(lines)});
+    note:$('cNote').value.trim(), tires:`${n} tire${n>1?'s':''}`, total:money(tot), order:orderText(true), picklist:pickList(lines)});
   try{
     const r=await fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});
     if(!r.ok) throw new Error(r.status);
