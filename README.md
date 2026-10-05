@@ -6,3 +6,5 @@ Used and take-off tire inventory for Champ Sets NC, 1501 Douglas Dr., Sanford, N
 - Hosted on Netlify. Every change saved to this repository goes live automatically.
 - Orders from the "Send order" button arrive as Netlify form submissions named **order** and are emailed to ChampSetsNc@gmail.com (set under Site configuration → Notifications).
 - Shop phone, email, hours and policies are in the `SHOP` settings near the top of the script in `index.html`.
+- Each verified order is also sent to the warehouse Pick List (Google Sheet) by `netlify/functions/pick-list.mjs`. It needs the environment variable **PICKLIST_URL** (the sheet's web app link ending in `/exec?key=...`), set under Project configuration → Environment variables. No outgoing webhook is used, so there is nothing for Netlify to disable.
+- The site hides tires that are on the Pick List, using `soldFeed` in the `SHOP` settings (the same link without the key).
