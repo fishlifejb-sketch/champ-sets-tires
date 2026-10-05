@@ -631,6 +631,8 @@ $('sendText').addEventListener('click',e=>{ if(!checkForm()){ e.preventDefault()
 $('sendOrder').addEventListener('click',async()=>{
   if(!checkForm()) return;
   const b=$('sendOrder'); b.disabled=true; b.textContent='Sending…';
+  // last-second check: if someone else just ordered any of these tires, stop and let the buyer review
+  if(await checkSold()){ b.disabled=false; b.textContent='Send order'; return; }
   const lines=quoteLines(), n=lines.reduce((s,x)=>s+x.q,0), tot=lines.reduce((s,x)=>s+x.sum,0);
   const body=new URLSearchParams({'form-name':'order', name:$('cName').value.trim(), phone:$('cPhone').value.trim(),
     note:$('cNote').value.trim(), tires:`${n} tire${n>1?'s':''}`, total:money(tot), order:orderText(true), picklist:pickList(lines)});
@@ -639,7 +641,7 @@ $('sendOrder').addEventListener('click',async()=>{
     if(!r.ok) throw new Error(r.status);
     $('doneTo').textContent=$('cPhone').value.trim(); $('donePickup').textContent=SHOP.pickup;
     document.querySelector('.sendrow').hidden=true; $('coDone').hidden=false; $('coErr').hidden=true;
-    quote.clear(); render(false);
+    quote.clear(); applySold(lines.flatMap(x=>x.picks.map(p=>p[0]))); render(false);
     $('coDone').scrollIntoView({block:'nearest'});
   }catch(_){
     $('coErr').textContent=`Your order didn't go through. Tap "Text my order" or call ${SHOP.phone}.`; $('coErr').hidden=false;
@@ -662,14 +664,14 @@ function restat(l){
   Object.assign(l,{qty,min:isFinite(min)?min:null,max,maxT});
 }
 function applySold(list){
-  const sold=new Set((list||[]).map(normSerial)); if(!sold.size) return;
+  const sold=new Set((list||[]).map(normSerial)); if(!sold.size) return 0;
   let changed=0, cartLost=0;
   for(const l of L){
     let hit=false;
     const g=l.groups.map(([t,s])=>{ const keep=s.filter(p=>!sold.has(normSerial(p[0]))); if(keep.length!==s.length) hit=true; return [t,keep]; });
     if(hit){ l.groups=g.filter(([,s])=>s.length); restat(l); changed++; }
   }
-  if(!changed) return;
+  if(!changed) return 0;
   for(const [k,q] of [...quote]){
     const [i,tr]=k.split('|'); const g=L[+i].groups.find(([gt])=>String(gt)===tr);
     const have=g?g[1].length:0;
@@ -681,14 +683,18 @@ function applySold(list){
     if(quote.size && !$('co').hidden && $('coDone').hidden){ $('coErr').textContent=msg; $('coErr').hidden=false; }
     else alert(msg);
   }
+  return cartLost;
 }
 function checkSold(){
-  if(!SHOP.soldFeed) return;
+  if(!SHOP.soldFeed) return Promise.resolve(0);
   const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),8000);
-  fetch(SHOP.soldFeed+(SHOP.soldFeed.includes('?')?'&':'?')+'sold=1',{signal:ctl.signal,cache:'no-store'})
-    .then(r=>r.json()).then(d=>applySold(d&&d.sold)).catch(()=>{}).finally(()=>clearTimeout(t));
+  return fetch(SHOP.soldFeed+(SHOP.soldFeed.includes('?')?'&':'?')+'sold=1',{signal:ctl.signal,cache:'no-store'})
+    .then(r=>r.json()).then(d=>applySold(d&&d.sold)).catch(()=>0).finally(()=>clearTimeout(t));
 }
 checkSold();
+// keep open pages current: re-check every minute while the page is in view, and when the shopper comes back to it
+setInterval(()=>{ if(document.visibilityState==='visible') checkSold(); }, 60000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') checkSold(); });
 </script>
 
 </body></html>
