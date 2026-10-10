@@ -187,6 +187,14 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 .form .fulfill .seg button{padding:9px 18px;font-size:15px;font-weight:600}
 .fnote{margin:2px 0 0;font-size:14px;line-height:1.45;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--chalk);border-radius:6px;padding:9px 12px;text-transform:none;letter-spacing:0;font-weight:400}
 .fnote b{font-weight:700}
+.custid{display:flex;flex-direction:column;gap:8px}
+.linkbtn{align-self:flex-start;background:none;border:none;padding:0;color:var(--muted);font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.custrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.custrow input{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:16px;text-transform:uppercase}
+.custok{margin:0;font-size:14px;color:var(--good);font-weight:700}
+.custok .linkbtn{margin-left:8px;font-weight:400}
+.cline s{color:var(--muted);font-weight:500;font-size:.75em;margin-right:6px}
+.cdisc{display:flex;justify-content:space-between;color:var(--good);font-weight:700;font-size:15px}
 .fnote .fsub{display:block;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)}
 .form .bad{border-color:var(--bad)}
 .sendrow{display:flex;flex-direction:column;gap:8px}
@@ -289,6 +297,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
   <div class="sheet">
     <div class="sheet-h"><h2 id="coTitle">Your cart</h2><button class="close" id="coClose" type="button" aria-label="Close">×</button></div>
     <div id="coLines" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div class="cdisc" id="coDisc" hidden><span>Customer discount (10%)</span><span id="coDiscAmt"></span></div>
     <div class="ctotal"><span id="coCount"></span><b id="coTotal"></b></div>
     <p class="note" style="margin:-8px 0 0">Used tires, sold off the rim. Total is before tax. 3-day exchange on any tire that leaks.</p>
     <div class="copick" id="coPickup" hidden></div>
@@ -305,6 +314,12 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
       <label>Business name (optional)<input id="cBiz" autocomplete="organization" placeholder="For shop orders"></label>
       <label>PO # (optional)<input id="cPO" autocomplete="off"></label>
       <label class="full">Note (optional)<textarea id="cNote" placeholder="Best day and time, questions, etc."></textarea></label>
+    </div>
+    <div class="custid">
+      <button type="button" class="linkbtn" id="custShow">Have a customer ID?</button>
+      <div class="custrow" id="custRow" hidden><input id="cCust" placeholder="Customer ID" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn ghost" id="custApply" type="button">Apply</button></div>
+      <p class="custok" id="custOk" hidden></p>
+      <p class="err" id="custErr" hidden></p>
     </div>
     <p class="err" id="coErr" hidden></p>
     <div class="sendrow">
@@ -332,7 +347,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 </form>
 <form name="order" data-netlify="true" netlify-honeypot="bot-field" hidden>
   <input name="bot-field"><input name="name"><input name="phone"><textarea name="note"></textarea>
-  <input name="tires"><input name="total"><textarea name="order"></textarea><textarea name="picklist"></textarea><input name="oid"><input name="fulfill"><textarea name="address"></textarea><input name="business"><input name="po">
+  <input name="tires"><input name="total"><textarea name="order"></textarea><textarea name="picklist"></textarea><input name="oid"><input name="fulfill"><textarea name="address"></textarea><input name="business"><input name="po"><input name="custid">
 </form>
 <script>
 // ---- Shop details: fill these in to show buyers how to reach you ----
@@ -635,12 +650,16 @@ const onListClick = e=>{
 $('list').addEventListener('click',onListClick);
 $('alts').addEventListener('click',onListClick);
 
+// Retail customer ID: 10% off, checked privately by a Netlify function (IDs never appear in this page)
+const DISC=0.10;
+const cust={id:'',name:'',ok:false};
+const dp=v=>v==null?null:(cust.ok?Math.round(v*(1-DISC)*100)/100:v);
 function quoteLines(){
   const lines=[];
   for(const [k,q] of quote){ const [i,tr]=k.split('|'); const l=L[+i]; const t = tr==='null'?null:+tr;
     const g=l.groups.find(([gt])=>String(gt)===String(t)); if(!g) continue;
-    const picks=g[1].slice(0,q); const sum=picks.reduce((a,x)=>a+(x[1]||0),0);
-    lines.push({k,l,t,q,picks,sum});
+    const picks=g[1].slice(0,q); const orig=picks.reduce((a,x)=>a+(x[1]||0),0); const sum=picks.reduce((a,x)=>a+(dp(x[1])||0),0);
+    lines.push({k,l,t,q,picks,sum,orig});
   }
   return lines;
 }
@@ -658,28 +677,30 @@ function orderText(shop){
   const name=$('cName').value.trim(), phone=$('cPhone').value.trim(), note=$('cNote').value.trim(), addr=$('cAddr').value.trim();
   const biz=$('cBiz').value.trim(), po=$('cPO').value.trim();
   const del=fulfill==='Delivery';
-  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, po?`PO #: ${po}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
+  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, 10% off`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
     ...lines.flatMap((x,i)=>[
       `${i+1}) ${x.q} x ${x.l.brand} ${x.l.model}`,
-      `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}`,
+      `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}${cust.ok?` (was ${money(x.orig)})`:''}`,
       `   Serial #s: ${x.picks.map(p=>p[0].replace(/\s+/g,'')+(shop&&p[2]?` (Bay NC-${p[2]})`:'')).join(', ')}`, ``]),
-    `TOTAL: ${n} tire${n>1?'s':''}, ${money(tot)} before tax`, !del&&SHOP.pickup?`Pickup: ${SHOP.pickup}`:null].filter(v=>v!==null).join('\n');
+    `TOTAL: ${n} tire${n>1?'s':''}, ${money(tot)} before tax${cust.ok?' (10% customer discount applied)':''}`, !del&&SHOP.pickup?`Pickup: ${SHOP.pickup}`:null].filter(v=>v!==null).join('\n');
 }
 // one entry per tire, for the warehouse pick list (Google Sheet fed by Netlify's webhook)
 function pickList(lines){
   const cond={N:'New',T:'Take-off',U:'Used'};
   return JSON.stringify(lines.flatMap(x=>x.picks.map(p=>({serial:String(p[0]).replace(/\s+/g,''), size:x.l.size, ls:x.l.ls||'',
-    brand:x.l.brand, model:x.l.model, tread:x.t, cond:cond[x.l.cond]||x.l.cond||'', price:p[1], bay:p[2]?'NC-'+p[2]:''}))));
+    brand:x.l.brand, model:x.l.model, tread:x.t, cond:cond[x.l.cond]||x.l.cond||'', price:dp(p[1]), bay:p[2]?'NC-'+p[2]:''}))));
 }
 function drawCart(){
   const lines=quoteLines(); const n=lines.reduce((s,x)=>s+x.q,0); const tot=lines.reduce((s,x)=>s+x.sum,0);
   $('coLines').innerHTML = lines.map(x=>`<div class="cline">
       <div><div class="sz">${x.l.size}</div><div class="nm">${x.q} × ${x.l.brand} ${x.l.model}</div><div class="sub">${x.l.ls?x.l.ls+' · ':''}${treadLine(x)} · ${money(x.sum/x.q)} each</div></div>
-      <div class="amt">${money(x.sum)}</div>
+      <div class="amt">${cust.ok?`<s>${money(x.orig)}</s>`:''}${money(x.sum)}</div>
       <div class="ids">Serial #s: ${x.picks.map(p=>p[0]).join(', ')}</div>
       <button class="x" type="button" data-k="${x.k}">Remove</button></div>`).join('');
   $('coCount').textContent = `${n} tire${n>1?'s':''}`;
   $('coTotal').textContent = money(tot);
+  const save=lines.reduce((s,x)=>s+x.orig,0)-tot;
+  $('coDisc').hidden=!cust.ok; $('coDiscAmt').textContent='−'+money(save);
   $('copyTo').textContent = SHOP.phone;
   textHref();
 }
@@ -690,6 +711,40 @@ function textHref(){
 function openCart(){ checkSold(); $('coDone').hidden=true; document.querySelector('.sendrow').hidden=false; drawCart(); $('co').hidden=false; document.body.style.overflow='hidden'; $('coErr').hidden=true; }
 function closeCart(){ $('co').hidden=true; document.body.style.overflow=''; }
 $('openCart').addEventListener('click',openCart);
+function custUI(){
+  $('custShow').hidden=cust.ok || !$('custRow').hidden;
+  $('custOk').hidden=!cust.ok;
+  if(cust.ok){ $('custRow').hidden=true; $('custOk').innerHTML=`✓ Customer ID ${escA(cust.id)}${cust.name?` (${escA(cust.name)})`:''}: 10% off applied <button type="button" class="linkbtn" id="custRemove">Remove</button>`; }
+  tray(); if(!$('co').hidden) drawCart();
+}
+async function applyCust(code, quiet){
+  code=String(code||'').trim().toUpperCase(); if(!code) return;
+  const err=$('custErr'), b=$('custApply'); err.hidden=true; b.disabled=true; b.textContent='Checking…';
+  try{
+    const r=await fetch('/.netlify/functions/customer-id?id='+encodeURIComponent(code),{cache:'no-store'});
+    const d=await r.json();
+    if(d.ok){
+      Object.assign(cust,{id:code,name:d.name||'',ok:true});
+      try{ localStorage.setItem('custId',code); }catch(_){}
+      if(cust.name && !$('cBiz').value.trim()) $('cBiz').value=cust.name;
+    } else {
+      Object.assign(cust,{id:'',name:'',ok:false});
+      try{ localStorage.removeItem('custId'); }catch(_){}
+      if(!quiet){ err.textContent="That customer ID isn't valid. Check it and try again."; err.hidden=false; }
+    }
+  }catch(_){
+    if(!quiet){ err.textContent=`Couldn't check that ID right now. Please try again, or call ${SHOP.phone}.`; err.hidden=false; }
+  }finally{ b.disabled=false; b.textContent='Apply'; custUI(); }
+}
+$('custShow').addEventListener('click',()=>{ $('custRow').hidden=false; $('custShow').hidden=true; $('cCust').focus(); });
+$('custApply').addEventListener('click',()=>applyCust($('cCust').value));
+$('cCust').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); applyCust($('cCust').value); } });
+document.addEventListener('click',e=>{ if(!e.target.closest('#custRemove')) return;
+  Object.assign(cust,{id:'',name:'',ok:false}); try{ localStorage.removeItem('custId'); }catch(_){}
+  $('cCust').value=''; $('custRow').hidden=true; custUI(); });
+// returning stores: re-check a saved ID quietly
+try{ const saved=localStorage.getItem('custId'); if(saved){ $('cCust').value=saved; applyCust(saved,true); } }catch(_){}
+
 $('clearCart').addEventListener('click',()=>{
   if(!confirm('Empty your cart?')) return;
   quote.clear(); render(false); tray();
@@ -744,7 +799,7 @@ $('sendOrder').addEventListener('click',async()=>{
   const d=new Date(), p2=v=>String(v).padStart(2,'0');
   const oid=`${p2(d.getMonth()+1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}-${Math.random().toString(36).slice(2,5).toUpperCase()}`;
   const body=new URLSearchParams({'form-name':'order', oid, fulfill, address: fulfill==='Delivery'?$('cAddr').value.trim():'',
-    business:$('cBiz').value.trim(), po:$('cPO').value.trim(), name:$('cName').value.trim(), phone:$('cPhone').value.trim(),
+    business:$('cBiz').value.trim(), po:$('cPO').value.trim(), custid:cust.ok?cust.id:'', name:$('cName').value.trim(), phone:$('cPhone').value.trim(),
     note:$('cNote').value.trim(), tires:`${n} tire${n>1?'s':''}`, total:money(tot), order:orderText(true), picklist:pickList(lines)});
   try{
     const r=await fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});

@@ -17,6 +17,12 @@ export default {
     const tags = [];
     if (data.fulfill) tags.push(data.fulfill === 'Delivery' ? `DELIVERY to ${data.address || '(no address given)'}` : 'PICKUP');
     if (data.po) tags.push(`PO ${data.po}`);
+    if (data.custid) {
+      // Re-check the customer ID here so a made-up ID can't slip a discount past the warehouse.
+      const valid = String(process.env.CUSTOMER_IDS || '').split(/[,;\n]+/)
+        .some(part => part.split('=')[0].trim().toUpperCase() === String(data.custid).trim().toUpperCase());
+      tags.push(valid ? `ID ${data.custid} 10% OFF` : `ID ${data.custid} NOT VALID, CHECK PRICES`);
+    }
     if (data.note) tags.push(data.note);
     data = { ...data, note: tags.join(' | ') };
     if (data.business) data.name = data.name ? `${data.business} (${data.name})` : data.business;
