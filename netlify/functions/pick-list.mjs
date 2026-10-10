@@ -33,9 +33,12 @@ export default {
     if (data.business) data.name = data.name ? `${data.business} (${data.name})` : data.business;
 
     // Same shape as Netlify's webhook payload, which the sheet script already understands.
-    // The order number doubles as the duplicate check, so a retry never adds the same order twice.
+    // The duplicate check uses the code plus the first tire's serial: a retry of the same order is skipped,
+    // but two different orders that happen to draw the same 6-digit code both still land on the sheet.
+    let first = '';
+    try { first = (JSON.parse(data.picklist || '[]')[0] || {}).serial || ''; } catch (e) {}
     const body = JSON.stringify({
-      form_name: 'order', id: data.oid || '', number: data.oid || '',
+      form_name: 'order', id: [data.oid, first].filter(Boolean).join('-'), number: data.oid || '',
       created_at: new Date().toISOString(), data,
     });
 

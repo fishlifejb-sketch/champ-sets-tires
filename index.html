@@ -682,9 +682,9 @@ const treadLine = x => x.t==null ? 'tread not listed' : `${x.t}/32 tread`;
 let curCode=null;
 function orderCode(){
   if(curCode) return curCode;
-  const d=new Date(), p2=v=>String(v).padStart(2,'0'), abc='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let r=''; for(let i=0;i<3;i++) r+=abc[Math.floor(Math.random()*abc.length)];
-  return curCode=`${p2(d.getMonth()+1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}-${r}`;
+  // 6 digits, never starting with 0 (easy to read over the phone; the sheet keeps it intact)
+  const n=crypto.getRandomValues(new Uint32Array(1))[0]%900000+100000;
+  return curCode=String(n);
 }
 function orderText(shop){
   const lines=quoteLines(); const n=lines.reduce((s,x)=>s+x.q,0); const tot=lines.reduce((s,x)=>s+x.sum,0);
