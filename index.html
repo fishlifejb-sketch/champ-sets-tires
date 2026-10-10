@@ -175,6 +175,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 .form .fulfill .seg button{padding:9px 18px;font-size:15px;font-weight:600}
 .fnote{margin:2px 0 0;font-size:14px;line-height:1.45;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--chalk);border-radius:6px;padding:9px 12px;text-transform:none;letter-spacing:0;font-weight:400}
 .fnote b{font-weight:700}
+.fnote .fsub{display:block;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)}
 .form .bad{border-color:var(--bad)}
 .sendrow{display:flex;flex-direction:column;gap:8px}
 .sendrow .btn{padding:13px 14px;font-size:16px;text-align:center;text-decoration:none}
@@ -635,7 +636,7 @@ $('coLines').addEventListener('click',e=>{const b=e.target.closest('button.x'); 
 let fulfill='Pickup';
 const FNOTE={
   Pickup:"<b>Same-day pickup.</b> Please pick up your tires the day you order. Orders not picked up by closing time are canceled and the tires go back in stock. Ordering after we close? Pick up the next day we're open.",
-  Delivery:"<b>Delivery.</b> We'll call or text you to confirm your address, delivery cost, delivery time, and payment before we deliver."
+  Delivery:"<b>Delivery.</b> We'll call or text you to confirm your address, delivery cost, delivery time, and payment before we deliver.<span class=\"fsub\">Tires ordered before 10 AM may be eligible for same-day delivery.</span>"
 };
 $('fNote').innerHTML=FNOTE[fulfill];
 $('fulfillSeg').addEventListener('click',e=>{
