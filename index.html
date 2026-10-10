@@ -206,6 +206,10 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 .done{display:flex;flex-direction:column;gap:10px;border:2px solid var(--good);border-radius:10px;padding:14px}
 .done h3{margin:0;font-family:var(--f-display);font-size:26px;text-transform:uppercase;color:var(--good)}
 .done p{margin:0}
+.ccode{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-2);border:1px dashed var(--good);border-radius:8px;padding:10px 12px}
+.ccode span{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ccode b{font-family:var(--f-mono);font-size:24px;letter-spacing:.04em;user-select:all}
+.ccode .btn{padding:8px 12px;font-size:13px}
 .to{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .to span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);grid-column:1/-1}
 .to b{font-size:16px;user-select:all;word-break:break-all}
@@ -335,6 +339,8 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
     </div>
     <div class="done" id="coDone" hidden>
       <h3>Order sent</h3>
+      <div class="ccode"><div><span>Confirmation code</span><b id="doneCode"></b></div><button class="btn ghost" id="copyCode" type="button">Copy</button></div>
+      <p class="note">Keep this code. Give it to us when you call, pick up, or take delivery.</p>
       <p>Thanks! We got your order and will call or text <b id="doneTo"></b> to confirm. <span id="donePickupLine">Pickup is at <b id="donePickup"></b>. Please pick up today before closing (or the next day we're open if you ordered after hours). Orders not picked up in time are canceled and the tires go back in stock.</span><span id="doneDeliverLine" hidden>Delivery to <b id="doneAddr"></b>: we'll go over the delivery cost, time and payment when we reach you.</span></p>
       <button class="btn" id="doneClose" type="button">Done</button>
     </div>
@@ -347,7 +353,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 </form>
 <form name="order" data-netlify="true" netlify-honeypot="bot-field" hidden>
   <input name="bot-field"><input name="name"><input name="phone"><textarea name="note"></textarea>
-  <input name="tires"><input name="total"><textarea name="order"></textarea><textarea name="picklist"></textarea><input name="oid"><input name="fulfill"><textarea name="address"></textarea><input name="business"><input name="po"><input name="custid"><input name="custpct">
+  <input name="tires"><input name="total"><textarea name="order"></textarea><textarea name="picklist"></textarea><input name="oid"><input name="fulfill"><textarea name="address"></textarea><input name="business"><input name="po"><input name="custid"><input name="custpct"><input name="subject">
 </form>
 <script>
 // ---- Shop details: fill these in to show buyers how to reach you ----
@@ -672,12 +678,20 @@ function tray(){
 }
 const sizeLine = x => `${x.l.size}${x.l.ls?' '+x.l.ls:''}`;
 const treadLine = x => x.t==null ? 'tread not listed' : `${x.t}/32 tread`;
+// Confirmation code, e.g. 1010-1308-K7Q (month-day, time, 3 characters). One per order; also the Pick List Order #.
+let curCode=null;
+function orderCode(){
+  if(curCode) return curCode;
+  const d=new Date(), p2=v=>String(v).padStart(2,'0'), abc='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let r=''; for(let i=0;i<3;i++) r+=abc[Math.floor(Math.random()*abc.length)];
+  return curCode=`${p2(d.getMonth()+1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}-${r}`;
+}
 function orderText(shop){
   const lines=quoteLines(); const n=lines.reduce((s,x)=>s+x.q,0); const tot=lines.reduce((s,x)=>s+x.sum,0);
   const name=$('cName').value.trim(), phone=$('cPhone').value.trim(), note=$('cNote').value.trim(), addr=$('cAddr').value.trim();
   const biz=$('cBiz').value.trim(), po=$('cPO').value.trim();
   const del=fulfill==='Delivery';
-  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, ${cust.pct}% off`:null, shop&&cust.ok&&cust.rep?`Sales rep: ${cust.rep}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
+  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, `Confirmation code: ${orderCode()}`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, ${cust.pct}% off`:null, shop&&cust.ok&&cust.rep?`Sales rep: ${cust.rep}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
     ...lines.flatMap((x,i)=>[
       `${i+1}) ${x.q} x ${x.l.brand} ${x.l.model}`,
       `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}${cust.ok?` (was ${money(x.orig)})`:''}`,
@@ -798,15 +812,16 @@ $('sendOrder').addEventListener('click',async()=>{
   // last-second check: if someone else just ordered any of these tires, stop and let the buyer review
   if(await checkSold()){ b.disabled=false; b.textContent='Send order'; return; }
   const lines=quoteLines(), n=lines.reduce((s,x)=>s+x.q,0), tot=lines.reduce((s,x)=>s+x.sum,0);
-  // order number, e.g. 1005-1934-K7Q (month-day, time, 3 random characters); also stops duplicate Pick List rows
-  const d=new Date(), p2=v=>String(v).padStart(2,'0');
-  const oid=`${p2(d.getMonth()+1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}-${Math.random().toString(36).slice(2,5).toUpperCase()}`;
-  const body=new URLSearchParams({'form-name':'order', oid, fulfill, address: fulfill==='Delivery'?$('cAddr').value.trim():'',
+  // confirmation code = Pick List Order #; also stops duplicate Pick List rows
+  const oid=orderCode();
+  const subject=`Order ${oid} · ${n} tire${n>1?'s':''} · ${fulfill.toUpperCase()}${$('cBiz').value.trim()?' · '+$('cBiz').value.trim():''}`;
+  const body=new URLSearchParams({'form-name':'order', oid, subject, fulfill, address: fulfill==='Delivery'?$('cAddr').value.trim():'',
     business:$('cBiz').value.trim(), po:$('cPO').value.trim(), custid:cust.ok?cust.id:'', custpct:cust.ok?String(cust.pct):'', name:$('cName').value.trim(), phone:$('cPhone').value.trim(),
     note:$('cNote').value.trim(), tires:`${n} tire${n>1?'s':''}`, total:money(tot), order:orderText(true), picklist:pickList(lines)});
   try{
     const r=await fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});
     if(!r.ok) throw new Error(r.status);
+    $('doneCode').textContent=oid; curCode=null; // next order gets a new code
     $('doneTo').textContent=$('cPhone').value.trim(); $('donePickup').textContent=SHOP.pickup; $('doneAddr').textContent=$('cAddr').value.trim();
     $('donePickupLine').hidden=fulfill==='Delivery'; $('doneDeliverLine').hidden=fulfill!=='Delivery';
     document.querySelector('.sendrow').hidden=true; $('coDone').hidden=false; $('coErr').hidden=true;
@@ -815,6 +830,10 @@ $('sendOrder').addEventListener('click',async()=>{
   }catch(_){
     $('coErr').textContent=`Your order didn't go through. Tap "Text my order" or call ${SHOP.phone}.`; $('coErr').hidden=false;
   }finally{ b.disabled=false; b.textContent='Send order'; }
+});
+$('copyCode').addEventListener('click',()=>{
+  const t=$('doneCode').textContent, b=$('copyCode');
+  try{ navigator.clipboard.writeText(t).then(()=>{ b.textContent='Copied'; setTimeout(()=>b.textContent='Copy',2000); }); }catch(_){}
 });
 $('doneClose').addEventListener('click',()=>{ closeCart(); tray(); });
 ['cName','cPhone','cAddr'].forEach(id=>$(id).addEventListener('input',()=>{ $(id).classList.remove('bad'); if($('cName').value.trim()&&$('cPhone').value.trim()&&(fulfill!=='Delivery'||$('cAddr').value.trim())) $('coErr').hidden=true; }));
