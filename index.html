@@ -810,7 +810,7 @@ $('sendOrder').addEventListener('click',async()=>{
     $('doneTo').textContent=$('cPhone').value.trim(); $('donePickup').textContent=SHOP.pickup; $('doneAddr').textContent=$('cAddr').value.trim();
     $('donePickupLine').hidden=fulfill==='Delivery'; $('doneDeliverLine').hidden=fulfill!=='Delivery';
     document.querySelector('.sendrow').hidden=true; $('coDone').hidden=false; $('coErr').hidden=true;
-    quote.clear(); lines.forEach(x=>x.picks.forEach(p=>mine.add(normSerial(p[0])))); applySold(); render(false);
+    quote.clear(); lines.forEach(x=>x.picks.forEach(p=>mine.set(normSerial(p[0]),Date.now()))); applySold(); render(false);
     $('coDone').scrollIntoView({block:'nearest'});
   }catch(_){
     $('coErr').textContent=`Your order didn't go through. Tap "Text my order" or call ${SHOP.phone}.`; $('coErr').hidden=false;
@@ -834,11 +834,12 @@ function restat(l){
 }
 // Every check rebuilds each listing from the full inventory, so tires removed from the Pick List come back too.
 L.forEach(l=>{ l.all=l.groups; });
-const mine=new Set(); // tires this shopper just ordered, hidden until the Pick List lists them
+const mine=new Map(); // tires this shopper just ordered -> time; hidden until the Pick List lists them (5 min max)
 let lastFeed=[];
 function applySold(list){
   if(list){ lastFeed=list; list.forEach(v=>mine.delete(normSerial(v))); } // once listed, the Pick List decides
-  const sold=new Set([...lastFeed.map(normSerial), ...mine]);
+  for(const [k,t] of [...mine]) if(Date.now()-t>300000) mine.delete(k);       // never hide past 5 minutes on our own
+  const sold=new Set([...lastFeed.map(normSerial), ...mine.keys()]);
   let changed=0, cartLost=0;
   for(const l of L){
     const g=l.all.map(([t,s])=>[t,s.filter(p=>!sold.has(normSerial(p[0])))]).filter(([,s])=>s.length);
