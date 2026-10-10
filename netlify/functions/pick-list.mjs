@@ -17,7 +17,9 @@ export default {
     // Pick List with any version of the sheet script.
     // Shop orders: business name in the Customer column, PO # in the Note.
     const tags = [];
-    if (data.fulfill) tags.push(data.fulfill === 'Delivery' ? `DELIVERY to ${data.address || '(no address given)'}` : 'PICKUP');
+    // The chosen time window goes right after PICKUP / DELIVERY, e.g. "PICKUP Sat 10/10, 1–3 PM".
+    const when = data.slot ? ` ${data.slot}` : '';
+    if (data.fulfill) tags.push(data.fulfill === 'Delivery' ? `DELIVERY${when} to ${data.address || '(no address given)'}` : `PICKUP${when}`);
     if (data.po) tags.push(`PO ${data.po}`);
     if (data.custid) {
       // Re-check the customer ID here so a made-up ID can't slip a discount past the warehouse.

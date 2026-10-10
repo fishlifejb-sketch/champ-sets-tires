@@ -179,8 +179,10 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 .ctotal b{font-family:var(--f-display);font-size:30px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .form .full{grid-column:1/-1}
-.form input,.form textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;font-family:var(--f-body);font-size:16px;min-height:0}
+.form input,.form textarea,.form select{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;font-family:var(--f-body);font-size:16px;min-height:0}
 .form textarea{min-height:70px;resize:vertical}
+.form select{height:44px;padding:0 10px;color:var(--ink);appearance:auto}
+.form select.bad{border-color:#c0392b;box-shadow:0 0 0 2px rgba(192,57,43,.15)}
 .form label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;flex-direction:column;gap:4px}
 .form .fulfill{display:flex;flex-direction:column;gap:6px}
 .form .flabel{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -317,7 +319,8 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
       <label>Phone<input id="cPhone" type="tel" autocomplete="tel" required></label>
       <label>Business name (optional)<input id="cBiz" autocomplete="organization" placeholder="For shop orders"></label>
       <label>PO # (optional)<input id="cPO" autocomplete="off"></label>
-      <label class="full">Note (optional)<textarea id="cNote" placeholder="Best day and time, questions, etc."></textarea></label>
+      <label class="full"><span id="timeLbl">Pickup time</span><select id="cTime"></select></label>
+      <label class="full">Note (optional)<textarea id="cNote" placeholder="Questions, a different time, etc."></textarea></label>
     </div>
     <div class="custid">
       <button type="button" class="linkbtn" id="custShow">Have a customer ID?</button>
@@ -341,7 +344,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
       <h3>Order sent</h3>
       <div class="ccode"><div><span>Confirmation code</span><b id="doneCode"></b></div><button class="btn ghost" id="copyCode" type="button">Copy</button></div>
       <p class="note">Keep this code. Give it to us when you call, pick up, or take delivery.</p>
-      <p>Thanks! We got your order and will call or text <b id="doneTo"></b> to confirm. <span id="donePickupLine">Pickup is at <b id="donePickup"></b>. Please pick up today before closing (or the next day we're open if you ordered after hours). Orders not picked up in time are canceled and the tires go back in stock.</span><span id="doneDeliverLine" hidden>Delivery to <b id="doneAddr"></b>: we'll go over the delivery cost, time and payment when we reach you.</span></p>
+      <p>Thanks! We got your order and will call or text <b id="doneTo"></b> to confirm. <span id="donePickupLine">Pickup is at <b id="donePickup"></b><span id="doneSlotP"></span>. Please pick up today before closing (or the next day we're open if you ordered after hours). Orders not picked up in time are canceled and the tires go back in stock.</span><span id="doneDeliverLine" hidden>Delivery to <b id="doneAddr"></b><span id="doneSlotD"></span>: we'll go over the delivery cost, time and payment when we reach you.</span></p>
       <button class="btn" id="doneClose" type="button">Done</button>
     </div>
   </div>
@@ -353,13 +356,15 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 </form>
 <form name="order" data-netlify="true" netlify-honeypot="bot-field" hidden>
   <input name="bot-field"><input name="name"><input name="phone"><textarea name="note"></textarea>
-  <input name="tires"><input name="total"><textarea name="order"></textarea><textarea name="picklist"></textarea><input name="oid"><input name="fulfill"><textarea name="address"></textarea><input name="business"><input name="po"><input name="custid"><input name="custpct"><input name="subject">
+  <input name="tires"><input name="total"><textarea name="order"></textarea><textarea name="picklist"></textarea><input name="oid"><input name="fulfill"><textarea name="address"></textarea><input name="business"><input name="po"><input name="custid"><input name="custpct"><input name="subject"><input name="slot">
 </form>
 <script>
 // ---- Shop details: fill these in to show buyers how to reach you ----
 const SHOP = { phone: "919-498-4834", email: "ChampSetsNc@gmail.com", pickup: "1501 Douglas Dr., Sanford, NC 27330",
   note: "Used tire sets, sold off the rim. Prices are per tire.",
   hours: [["Mon – Fri","7 AM – 5 PM"],["Saturday","8 AM – 3 PM"]], hoursNote: "Other meet times available on request.",
+  // pickup/delivery time choices: open hours by weekday (0 = Sunday), in 2-hour windows
+  open: {0:null, 1:[7,17], 2:[7,17], 3:[7,17], 4:[7,17], 5:[7,17], 6:[8,15]}, slotHours: 2,
   policy: "3-day exchange on any tire that leaks.", service: "No mounting or balancing at this time.",
   // Warehouse Pick List web app link (ends in /exec, no ?key). Tires already ordered are hidden from the site.
   soldFeed: "https://script.google.com/macros/s/AKfycbzp2EYAEbh-5Pb2ug7WMNx5aLU5ShG1Z8IToKvqWsnsc-Os_lbWMc-8IKEGAqleiYWD/exec",
@@ -689,9 +694,9 @@ function orderCode(){
 function orderText(shop){
   const lines=quoteLines(); const n=lines.reduce((s,x)=>s+x.q,0); const tot=lines.reduce((s,x)=>s+x.sum,0);
   const name=$('cName').value.trim(), phone=$('cPhone').value.trim(), note=$('cNote').value.trim(), addr=$('cAddr').value.trim();
-  const biz=$('cBiz').value.trim(), po=$('cPO').value.trim();
+  const biz=$('cBiz').value.trim(), po=$('cPO').value.trim(), slot=$('cTime').value;
   const del=fulfill==='Delivery';
-  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, `Confirmation code: ${orderCode()}`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, ${cust.pct}% off`:null, shop&&cust.ok&&cust.rep?`Sales rep: ${cust.rep}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
+  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, `Confirmation code: ${orderCode()}`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, slot?`${del?'Delivery':'Pickup'} time: ${slot}`:null, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, ${cust.pct}% off`:null, shop&&cust.ok&&cust.rep?`Sales rep: ${cust.rep}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
     ...lines.flatMap((x,i)=>[
       `${i+1}) ${x.q} x ${x.l.brand} ${x.l.model}`,
       `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}${cust.ok?` (was ${money(x.orig)})`:''}`,
@@ -722,7 +727,7 @@ function textHref(){
   const sep=/iP(hone|ad|od)/.test(navigator.userAgent)?'&':'?';
   $('sendText').href=`sms:${SHOP.phone.replace(/[^\d+]/g,'')}${sep}body=${encodeURIComponent(orderText())}`;
 }
-function openCart(){ checkSold(); $('coDone').hidden=true; document.querySelector('.sendrow').hidden=false; drawCart(); $('co').hidden=false; document.body.style.overflow='hidden'; $('coErr').hidden=true; }
+function openCart(){ checkSold(); fillSlots(); $('coDone').hidden=true; document.querySelector('.sendrow').hidden=false; drawCart(); $('co').hidden=false; document.body.style.overflow='hidden'; $('coErr').hidden=true; }
 function closeCart(){ $('co').hidden=true; document.body.style.overflow=''; }
 $('openCart').addEventListener('click',openCart);
 function custUI(){
@@ -770,6 +775,34 @@ $('coClose').addEventListener('click',closeCart);
 $('co').addEventListener('click',e=>{ if(e.target===$('co')) closeCart(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('co').hidden) closeCart(); });
 $('coLines').addEventListener('click',e=>{const b=e.target.closest('button.x'); if(!b) return; quote.delete(b.dataset.k); render(false); tray();});
+// Pickup / delivery time: 2-hour windows in shop hours (shop time zone), today's that haven't ended,
+// or the next open day's when we're closed
+function shopNow(){
+  const p={}; new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',hourCycle:'h23'})
+    .formatToParts(new Date()).forEach(x=>p[x.type]=x.value);
+  return {y:+p.year, m:+p.month, d:+p.day, mins:(+p.hour%24)*60+(+p.minute)};
+}
+function hrRange(a,b){ const f=h=>h%12||12, ap=h=>h<12?'AM':'PM'; return ap(a)===ap(b)?`${f(a)}–${f(b)} ${ap(b)}`:`${f(a)} ${ap(a)}–${f(b)} ${ap(b)}`; }
+function timeSlots(){
+  const n=shopNow(), out=[], wd='Sun Mon Tue Wed Thu Fri Sat'.split(' ');
+  for(let i=0;i<8&&!out.length;i++){
+    const day=new Date(Date.UTC(n.y,n.m-1,n.d+i)), hrs=SHOP.open[day.getUTCDay()]; if(!hrs) continue;
+    const tag=`${wd[day.getUTCDay()]} ${day.getUTCMonth()+1}/${day.getUTCDate()}`;
+    for(let h=hrs[0];h<hrs[1];h+=SHOP.slotHours){
+      const e=Math.min(h+SHOP.slotHours,hrs[1]); if(i===0 && e*60<=n.mins) continue;
+      const span=hrRange(h,e); out.push({v:`${tag}, ${span}`, t:`${i===0?'Today':tag}, ${span}`});
+    }
+  }
+  return out;
+}
+const OTHER_TIME='Other time (see note)';
+function fillSlots(){
+  const sel=$('cTime'), cur=sel.value;
+  sel.innerHTML='<option value="">Choose a time</option>'+timeSlots().map(o=>`<option value="${o.v}">${o.t}</option>`).join('')+`<option value="${OTHER_TIME}">Other time (put it in the note)</option>`;
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  $('timeLbl').textContent=fulfill+' time';
+}
+$('cTime').addEventListener('change',()=>{ $('cTime').classList.remove('bad'); $('coErr').hidden=true; textHref(); });
 // Pickup or delivery
 let fulfill='Pickup';
 const FNOTE={
@@ -785,14 +818,16 @@ $('fulfillSeg').addEventListener('click',e=>{
   $('coPickup').hidden=!SHOP.pickup || fulfill==='Delivery';
   $('fNote').innerHTML=FNOTE[fulfill];
   if(fulfill==='Delivery') $('cAddr').focus();
+  $('timeLbl').textContent=fulfill+' time';
   textHref();
 });
 function checkForm(){
   const need=['cName','cPhone']; if(fulfill==='Delivery') need.unshift('cAddr');
   let first=null;
   for(const id of need){ const el=$(id); const bad=!el.value.trim(); el.classList.toggle('bad',bad); if(bad&&!first) first=id; }
+  const noTime=!$('cTime').value; $('cTime').classList.toggle('bad',noTime); if(noTime&&!first) first='cTime';
   $('coErr').hidden=!first;
-  if(first){ $('coErr').textContent = first==='cAddr' ? 'Please add the delivery address.' : 'Please add your name and phone so we can confirm your order.'; $(first).focus(); }
+  if(first){ $('coErr').textContent = first==='cAddr' ? 'Please add the delivery address.' : first==='cTime' ? `Please choose a ${fulfill.toLowerCase()} time.` : 'Please add your name and phone so we can confirm your order.'; $(first).focus(); }
   return !first;
 }
 document.addEventListener('click',e=>{
@@ -814,8 +849,9 @@ $('sendOrder').addEventListener('click',async()=>{
   const lines=quoteLines(), n=lines.reduce((s,x)=>s+x.q,0), tot=lines.reduce((s,x)=>s+x.sum,0);
   // confirmation code = Pick List Order #; also stops duplicate Pick List rows
   const oid=orderCode();
-  const subject=`Order ${oid} · ${n} tire${n>1?'s':''} · ${fulfill.toUpperCase()}${$('cBiz').value.trim()?' · '+$('cBiz').value.trim():''}`;
-  const body=new URLSearchParams({'form-name':'order', oid, subject, fulfill, address: fulfill==='Delivery'?$('cAddr').value.trim():'',
+  const slot=$('cTime').value;
+  const subject=`Order ${oid} · ${n} tire${n>1?'s':''} · ${fulfill.toUpperCase()} ${slot}${$('cBiz').value.trim()?' · '+$('cBiz').value.trim():''}`;
+  const body=new URLSearchParams({'form-name':'order', oid, subject, fulfill, slot, address: fulfill==='Delivery'?$('cAddr').value.trim():'',
     business:$('cBiz').value.trim(), po:$('cPO').value.trim(), custid:cust.ok?cust.id:'', custpct:cust.ok?String(cust.pct):'', name:$('cName').value.trim(), phone:$('cPhone').value.trim(),
     note:$('cNote').value.trim(), tires:`${n} tire${n>1?'s':''}`, total:money(tot), order:orderText(true), picklist:pickList(lines)});
   try{
@@ -823,6 +859,7 @@ $('sendOrder').addEventListener('click',async()=>{
     if(!r.ok) throw new Error(r.status);
     $('doneCode').textContent=oid; curCode=null; // next order gets a new code
     $('doneTo').textContent=$('cPhone').value.trim(); $('donePickup').textContent=SHOP.pickup; $('doneAddr').textContent=$('cAddr').value.trim();
+    const when=slot===OTHER_TIME?'':`, ${slot}`; $('doneSlotP').textContent=when; $('doneSlotD').textContent=when;
     $('donePickupLine').hidden=fulfill==='Delivery'; $('doneDeliverLine').hidden=fulfill!=='Delivery';
     document.querySelector('.sendrow').hidden=true; $('coDone').hidden=false; $('coErr').hidden=true;
     quote.clear(); lines.forEach(x=>x.picks.forEach(p=>mine.set(normSerial(p[0]),Date.now()))); applySold(); render(false);
