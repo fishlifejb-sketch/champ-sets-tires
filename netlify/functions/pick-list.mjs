@@ -13,10 +13,13 @@ export default {
 
     // Put Pickup / Delivery (and the delivery address) at the front of the Note, so it shows on the
     // Pick List with any version of the sheet script.
-    if (data.fulfill) {
-      const tag = data.fulfill === 'Delivery' ? `DELIVERY to ${data.address || '(no address given)'}` : 'PICKUP';
-      data = { ...data, note: data.note ? `${tag} | ${data.note}` : tag };
-    }
+    // Shop orders: business name in the Customer column, PO # in the Note.
+    const tags = [];
+    if (data.fulfill) tags.push(data.fulfill === 'Delivery' ? `DELIVERY to ${data.address || '(no address given)'}` : 'PICKUP');
+    if (data.po) tags.push(`PO ${data.po}`);
+    if (data.note) tags.push(data.note);
+    data = { ...data, note: tags.join(' | ') };
+    if (data.business) data.name = data.name ? `${data.business} (${data.name})` : data.business;
 
     // Same shape as Netlify's webhook payload, which the sheet script already understands.
     // The order number doubles as the duplicate check, so a retry never adds the same order twice.
