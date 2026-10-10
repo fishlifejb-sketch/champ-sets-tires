@@ -652,7 +652,7 @@ $('alts').addEventListener('click',onListClick);
 
 // Retail customer ID: each store's own discount (set in the Customers sheet, 10% if blank),
 // checked privately by a Netlify function (IDs never appear in this page)
-const cust={id:'',name:'',ok:false,pct:10};
+const cust={id:'',name:'',ok:false,pct:10,rep:''};
 const dp=v=>v==null?null:(cust.ok?Math.round(v*(1-cust.pct/100)*100)/100:v);
 function quoteLines(){
   const lines=[];
@@ -677,7 +677,7 @@ function orderText(shop){
   const name=$('cName').value.trim(), phone=$('cPhone').value.trim(), note=$('cNote').value.trim(), addr=$('cAddr').value.trim();
   const biz=$('cBiz').value.trim(), po=$('cPO').value.trim();
   const del=fulfill==='Delivery';
-  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, ${cust.pct}% off`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
+  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, ${cust.pct}% off`:null, shop&&cust.ok&&cust.rep?`Sales rep: ${cust.rep}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
     ...lines.flatMap((x,i)=>[
       `${i+1}) ${x.q} x ${x.l.brand} ${x.l.model}`,
       `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}${cust.ok?` (was ${money(x.orig)})`:''}`,
@@ -724,7 +724,7 @@ async function applyCust(code, quiet){
     const r=await fetch('/.netlify/functions/customer-id?id='+encodeURIComponent(code),{cache:'no-store'});
     const d=await r.json();
     if(d.ok){
-      const pct=Number(d.pct); Object.assign(cust,{id:code,name:d.name||'',ok:true,pct:(pct>0&&pct<=50)?pct:10});
+      const pct=Number(d.pct); Object.assign(cust,{id:code,name:d.name||'',ok:true,pct:(pct>0&&pct<=50)?pct:10,rep:d.rep||''});
       try{ localStorage.setItem('custId',code); }catch(_){}
       // fill in the store's saved details (only into empty boxes, so nothing typed gets overwritten)
       const fill=(id,v)=>{ if(v && !$(id).value.trim()){ $(id).value=v; $(id).classList.remove('bad'); } };

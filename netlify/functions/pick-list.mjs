@@ -26,6 +26,7 @@ export default {
       if (!c) tags.push(`ID ${data.custid} NOT VALID, CHECK PRICES`);
       else if (Math.abs(c.pct - used) > 0.001) tags.push(`ID ${data.custid} ${used}% APPLIED BUT SHEET SAYS ${c.pct}%, CHECK PRICES`);
       else tags.push(`ID ${data.custid} ${used}% OFF`);
+      if (c && c.rep) tags.push(`REP ${c.rep}`);
     }
     if (data.note) tags.push(data.note);
     data = { ...data, note: tags.join(' | ') };

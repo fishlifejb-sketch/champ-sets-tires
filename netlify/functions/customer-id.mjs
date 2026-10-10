@@ -7,7 +7,7 @@ export default async (req) => {
   const id = (new URL(req.url).searchParams.get('id') || '').trim().toUpperCase();
   await new Promise(r => setTimeout(r, 400)); // slows down anyone trying to guess IDs
   const c = id ? (await loadCustomers()).get(id) : null;
-  const body = c ? { ok: true, name: c.business, contact: c.contact, phone: c.phone, address: c.address, pct: c.pct } : { ok: false };
+  const body = c ? { ok: true, name: c.business, contact: c.contact, phone: c.phone, address: c.address, pct: c.pct, rep: c.rep } : { ok: false };
   return new Response(JSON.stringify(body), {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
