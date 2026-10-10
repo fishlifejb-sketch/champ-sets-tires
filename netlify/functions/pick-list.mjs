@@ -7,9 +7,16 @@
 export default {
   async formSubmitted(event) {
     const url = process.env.PICKLIST_URL;
-    const data = (event && event.data) || {};
+    let data = (event && event.data) || {};
     if (!url) { console.log('PICKLIST_URL is not set; add it under Environment variables'); return; }
     if (!data.picklist && !data.order) { console.log('Not an order; skipped'); return; }
+
+    // Put Pickup / Delivery (and the delivery address) at the front of the Note, so it shows on the
+    // Pick List with any version of the sheet script.
+    if (data.fulfill) {
+      const tag = data.fulfill === 'Delivery' ? `DELIVERY to ${data.address || '(no address given)'}` : 'PICKUP';
+      data = { ...data, note: data.note ? `${tag} | ${data.note}` : tag };
+    }
 
     // Same shape as Netlify's webhook payload, which the sheet script already understands.
     // The order number doubles as the duplicate check, so a retry never adds the same order twice.
