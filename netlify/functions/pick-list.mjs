@@ -1,3 +1,5 @@
+import { loadCustomers } from '../lib/customers.mjs';
+
 // Sends each verified website order to the warehouse Pick List (Google Sheet).
 // Runs on Netlify's servers for every verified submission, so there is no outgoing webhook to get disabled,
 // and the sheet's private key stays in a Netlify setting instead of the public site code.
@@ -19,8 +21,7 @@ export default {
     if (data.po) tags.push(`PO ${data.po}`);
     if (data.custid) {
       // Re-check the customer ID here so a made-up ID can't slip a discount past the warehouse.
-      const valid = String(process.env.CUSTOMER_IDS || '').split(/[,;\n]+/)
-        .some(part => part.split('=')[0].trim().toUpperCase() === String(data.custid).trim().toUpperCase());
+      const valid = (await loadCustomers()).has(String(data.custid).trim().toUpperCase());
       tags.push(valid ? `ID ${data.custid} 10% OFF` : `ID ${data.custid} NOT VALID, CHECK PRICES`);
     }
     if (data.note) tags.push(data.note);

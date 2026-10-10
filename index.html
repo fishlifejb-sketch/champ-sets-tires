@@ -726,7 +726,10 @@ async function applyCust(code, quiet){
     if(d.ok){
       Object.assign(cust,{id:code,name:d.name||'',ok:true});
       try{ localStorage.setItem('custId',code); }catch(_){}
-      if(cust.name && !$('cBiz').value.trim()) $('cBiz').value=cust.name;
+      // fill in the store's saved details (only into empty boxes, so nothing typed gets overwritten)
+      const fill=(id,v)=>{ if(v && !$(id).value.trim()){ $(id).value=v; $(id).classList.remove('bad'); } };
+      fill('cBiz',cust.name); fill('cName',d.contact); fill('cPhone',d.phone); fill('cAddr',d.address);
+      textHref();
     } else {
       Object.assign(cust,{id:'',name:'',ok:false});
       try{ localStorage.removeItem('custId'); }catch(_){}
