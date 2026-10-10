@@ -173,6 +173,8 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 .form .fulfill{display:flex;flex-direction:column;gap:6px}
 .form .flabel{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .form .fulfill .seg button{padding:9px 18px;font-size:15px;font-weight:600}
+.fnote{margin:2px 0 0;font-size:14px;line-height:1.45;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--chalk);border-radius:6px;padding:9px 12px;text-transform:none;letter-spacing:0;font-weight:400}
+.fnote b{font-weight:700}
 .form .bad{border-color:var(--bad)}
 .sendrow{display:flex;flex-direction:column;gap:8px}
 .sendrow .btn{padding:13px 14px;font-size:16px;text-align:center;text-decoration:none}
@@ -281,7 +283,8 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
         <div class="seg" id="fulfillSeg" role="group" aria-labelledby="fLabel">
           <button type="button" data-v="Pickup" aria-pressed="true">Pickup</button>
           <button type="button" data-v="Delivery" aria-pressed="false">Delivery</button>
-        </div></div>
+        </div>
+        <p class="fnote" id="fNote" aria-live="polite"></p></div>
       <label class="full" id="addrWrap" hidden>Delivery address<textarea id="cAddr" autocomplete="street-address" placeholder="Street, city, ZIP"></textarea></label>
       <label>Your name<input id="cName" autocomplete="name" required></label>
       <label>Phone<input id="cPhone" type="tel" autocomplete="tel" required></label>
@@ -301,7 +304,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
     </div>
     <div class="done" id="coDone" hidden>
       <h3>Order sent</h3>
-      <p>Thanks! We got your order and will call or text <b id="doneTo"></b> to confirm. <span id="donePickupLine">Pickup is at <b id="donePickup"></b>.</span><span id="doneDeliverLine" hidden>We'll set up delivery to <b id="doneAddr"></b>.</span></p>
+      <p>Thanks! We got your order and will call or text <b id="doneTo"></b> to confirm. <span id="donePickupLine">Pickup is at <b id="donePickup"></b>. Please pick up today before closing (or the next day we're open if you ordered after hours). Orders not picked up in time are canceled.</span><span id="doneDeliverLine" hidden>Delivery to <b id="doneAddr"></b>: we'll go over the delivery cost, time and payment when we reach you.</span></p>
       <button class="btn" id="doneClose" type="button">Done</button>
     </div>
   </div>
@@ -630,12 +633,18 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('co').hidden)
 $('coLines').addEventListener('click',e=>{const b=e.target.closest('button.x'); if(!b) return; quote.delete(b.dataset.k); render(false); tray();});
 // Pickup or delivery
 let fulfill='Pickup';
+const FNOTE={
+  Pickup:"<b>Same-day pickup:</b> please pick up your tires the day you order. Orders not picked up by closing time are canceled and the tires go back on sale. Ordering after we close? Pick up the next day we're open.",
+  Delivery:"<b>Delivery:</b> we'll call or text you to confirm your address, delivery cost, delivery time, and payment before we deliver."
+};
+$('fNote').innerHTML=FNOTE[fulfill];
 $('fulfillSeg').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
   fulfill=b.dataset.v;
   $('fulfillSeg').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
   $('addrWrap').hidden=fulfill!=='Delivery'; $('cAddr').classList.remove('bad'); $('coErr').hidden=true;
   $('coPickup').hidden=!SHOP.pickup || fulfill==='Delivery';
+  $('fNote').innerHTML=FNOTE[fulfill];
   if(fulfill==='Delivery') $('cAddr').focus();
   textHref();
 });
