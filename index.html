@@ -143,6 +143,8 @@ aside.filters{display:flex;flex-direction:column;gap:18px;align-self:start;posit
 .tray-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:flex-start;gap:16px}
 .tray-sum{font-variant-numeric:tabular-nums;text-align:left;min-width:0}
 #openCart{flex:none;white-space:nowrap}
+.trayx{flex:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--bad);font-size:24px;line-height:1;font-weight:700;cursor:pointer;display:grid;place-items:center;padding:0 0 2px}
+.trayx:hover{border-color:var(--bad)}
 #openCart .sm{display:none}
 @media (max-width:480px){
   .tray-in{gap:12px}
@@ -277,6 +279,7 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
 
 <div class="tray" id="tray" hidden>
     <div class="tray-in">
+    <button class="trayx" id="clearCart" type="button" aria-label="Empty cart" title="Empty cart">&times;</button>
     <div class="tray-sum" id="traySum"></div>
     <button class="btn" id="openCart" type="button"><span class="lg">Review cart &amp; send order</span><span class="sm">Review &amp; send order</span></button>
   </div>
@@ -687,6 +690,10 @@ function textHref(){
 function openCart(){ checkSold(); $('coDone').hidden=true; document.querySelector('.sendrow').hidden=false; drawCart(); $('co').hidden=false; document.body.style.overflow='hidden'; $('coErr').hidden=true; }
 function closeCart(){ $('co').hidden=true; document.body.style.overflow=''; }
 $('openCart').addEventListener('click',openCart);
+$('clearCart').addEventListener('click',()=>{
+  if(!confirm('Empty your cart?')) return;
+  quote.clear(); render(false); tray();
+});
 $('coClose').addEventListener('click',closeCart);
 $('co').addEventListener('click',e=>{ if(e.target===$('co')) closeCart(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('co').hidden) closeCart(); });
