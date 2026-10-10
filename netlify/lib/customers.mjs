@@ -1,8 +1,17 @@
 // Retail customers for the private 10% discount. Two sources, both kept out of the public site code:
 //   CUSTOMERS_CSV_URL  the "Customers" tab of the Pick List sheet, published to the web as CSV
-//                      (columns: Customer ID, Business, Contact name, Phone, Delivery address, Active)
+//                      (columns: Customer ID, Business, Contact name, Phone, Delivery address, Discount %, Active)
 //   CUSTOMER_IDS       optional simple list, e.g.  SMITH24=Smith Tire, ABCAUTO7=ABC Auto
 let cache = { at: 0, map: null };
+const DEFAULT_PCT = 10;
+const MAX_PCT = 50; // guards against a typo like 100 giving tires away
+
+// "15", "15%", " 12.5 " -> 15 / 12.5; blank or unreadable -> 10; capped at 50
+export function readPct(v) {
+  const n = parseFloat(String(v == null ? '' : v).replace('%', '').trim());
+  if (!isFinite(n) || n <= 0) return DEFAULT_PCT;
+  return Math.min(n < 1 ? n * 100 : n, MAX_PCT);
+}
 
 export function parseCsv(text) {
   const rows = []; let row = [], cell = '', q = false;
@@ -28,7 +37,7 @@ export async function loadCustomers() {
   String(process.env.CUSTOMER_IDS || '').split(/[,;\n]+/).forEach(part => {
     const [key, ...name] = part.split('=');
     const id = (key || '').trim().toUpperCase();
-    if (id) map.set(id, { business: name.join('=').trim(), contact: '', phone: '', address: '' });
+    if (id) map.set(id, { business: name.join('=').trim(), contact: '', phone: '', address: '', pct: DEFAULT_PCT });
   });
   const url = process.env.CUSTOMERS_CSV_URL;
   if (url) {
@@ -38,14 +47,14 @@ export async function loadCustomers() {
       const rows = parseCsv(await r.text());
       const head = (rows[0] || []).map(h => h.trim().toLowerCase());
       const ix = name => head.findIndex(h => h.startsWith(name));
-      const iId = ix('customer id'), iBiz = ix('business'), iCon = ix('contact'), iPh = ix('phone'), iAd = ix('delivery address'), iAct = ix('active');
+      const iId = ix('customer id'), iBiz = ix('business'), iCon = ix('contact'), iPh = ix('phone'), iAd = ix('delivery address'), iAct = ix('active'), iPct = ix('discount');
       if (iId < 0) throw new Error('no "Customer ID" column');
       for (const row of rows.slice(1)) {
         const id = String(row[iId] || '').trim().toUpperCase();
         if (!id) continue;
         if (iAct >= 0 && /^(n|no|inactive|false|off)$/i.test(String(row[iAct] || '').trim())) { map.delete(id); continue; }
         const get = i => (i >= 0 ? String(row[i] || '').trim() : '');
-        map.set(id, { business: get(iBiz), contact: get(iCon), phone: get(iPh), address: get(iAd) });
+        map.set(id, { business: get(iBiz), contact: get(iCon), phone: get(iPh), address: get(iAd), pct: readPct(get(iPct)) });
       }
     } catch (err) {
       console.log('Could not read the Customers sheet:', String(err));
