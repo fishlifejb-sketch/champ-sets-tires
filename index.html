@@ -469,12 +469,21 @@ function okGroups(l){ return l.groups.filter(([t])=> st.tread===0 || (t!=null &&
 function dims(w,a,r){
   const ws=String(w).toLowerCase(), R=parseFloat(r), A=parseFloat(a), W=parseFloat(ws);
   if(isNaN(R)||isNaN(A)||isNaN(W)) return null;
-  if(ws.endsWith('x') || (W<50 && A<25)) return {d:W, wmm:A*25.4};      // flotation: 31x10.50R15
-  if(W>=100 && A>=25 && A<=95) return {d:R+2*W*A/100/25.4, wmm:W};      // metric: 225/65R17
+  if(ws.endsWith('x') || (W<50 && A<25)) return {d:W, wmm:A*25.4, asp:60};  // flotation: 31x10.50R15 (rims like a 60-series LT)
+  if(W>=100 && A>=25 && A<=95) return {d:R+2*W*A/100/25.4, wmm:W, asp:A};  // metric: 225/65R17
   return null;
 }
+// approved rim width range (inches) for a size, from its section width and aspect ratio
+// (matches the published ranges: 265/60R20 7-9", 35x12.50R20 8.5-11", 225/45R17 7-8.5")
+function rimRange(dm){
+  const W=dm.wmm/25.4, a=dm.asp, h=x=>Math.round(x*2)/2;
+  const t = a>=67.5?[.65,.85]: a>=57.5?[.67,.87]: a>=52.5?[.68,.90]: a>=47.5?[.72,.92]: a>=42.5?[.78,.96]: a>=37.5?[.83,1.0]:[.85,1.02];
+  return [h(W*t[0]), h(W*t[1])];
+}
+// a size fits the searched size's rim when its rim range covers the middle of the searched size's range
+function sameRim(ld,td){ const [a,b]=rimRange(td), [c,d]=rimRange(ld), mid=(a+b)/2; return c<=mid && mid<=d; }
 const FIT_PCT = 2.75;  // max difference in overall height, % (taller or shorter)
-const FIT_WMM = Infinity; // no tread-width limit: every same-rim size within FIT_PCT shows
+const FIT_WMM = Infinity; // no separate tread-width limit; sameRim() keeps widths that mount on the same rim
 // the exact size being looked for, when width, ratio and rim are all known
 function targetSize(sz){
   if(st.w && st.a && st.r) return {w:st.w,a:st.a,r:st.r};
@@ -493,7 +502,7 @@ function filtered(){
       if(!td || num(l.r)!==num(tgt.r)) continue;
       const ld = dims(l.w,l.a,l.r); if(!ld) continue;
       const pct = (ld.d-td.d)/td.d*100;
-      if(Math.abs(pct)>FIT_PCT || Math.abs(ld.wmm-td.wmm)>FIT_WMM) continue;
+      if(Math.abs(pct)>FIT_PCT || Math.abs(ld.wmm-td.wmm)>FIT_WMM || !sameRim(ld,td)) continue;
       fit = {pct, d:ld.d};
     }
     if(terms.length && !terms.every(t=>l.hay.includes(t))) continue;
@@ -616,7 +625,7 @@ function render(resetScroll=true){
   if(tgt && alts.length){
     head = `<div class="altsep" role="separator">
       <h3>Also fits ${tgt.label}</h3>
-      <p><b>${altSizes.join(', ')}</b>: same ${tgt.r}" rim, overall height within ${FIT_PCT}% of ${tgt.label} (<b>${tgt.d.toFixed(1)}"</b>), so the speedometer stays accurate. ${atires.toLocaleString()} tires. Check that the load index meets the door-jamb spec and that your rim width suits the new width.</p></div>`;
+      <p><b>${altSizes.join(', ')}</b>: same ${tgt.r}" rim size and rim width as ${tgt.label}, overall height within ${FIT_PCT}% (<b>${tgt.d.toFixed(1)}"</b>), so the speedometer stays accurate. ${atires.toLocaleString()} tires. Check that the load index meets the door-jamb spec.</p></div>`;
   } else if(tgt && altNeed.length){
     head = `<div class="altsep" role="separator">
       <h3>Also fits ${tgt.label}</h3>
