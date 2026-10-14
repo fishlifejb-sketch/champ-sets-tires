@@ -59,17 +59,14 @@ select,input[type=search],input[type=number]{width:100%;background:var(--surface
 .sidewall b{color:var(--ink);font-weight:600}
 
 .main{display:grid;grid-template-columns:230px minmax(0,1fr);gap:24px;padding-block:18px 120px}
-aside.filters{display:flex;flex-direction:column;gap:18px;align-self:start;position:sticky;top:120px}
+aside.filters{display:flex;flex-direction:column;gap:18px;align-self:start;position:sticky;top:calc(var(--fh,120px) + 16px)}
 .fgroup{display:flex;flex-direction:column;gap:6px}
 .fgroup h3{margin:0;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;cursor:pointer;font-size:13px;font-weight:500}
 .seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .hint{font-size:12px;color:var(--muted);margin:0}
-.wheelrow{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
-.wheelrow span{font-family:var(--f-display);font-weight:700;color:var(--muted)}
-.wheelon{font-size:13px;margin:0;color:var(--ink)}
-.wheelon b{font-family:var(--f-display)}
+.wheel-row{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
 .reset{background:none;border:none;color:var(--accent);padding:0;cursor:pointer;font-weight:600;font-size:13px;text-align:left}
 .filtToggle{display:none}
 
@@ -114,7 +111,7 @@ aside.filters{display:flex;flex-direction:column;gap:18px;align-self:start;posit
 .jump{background:none;border:none;padding:0;color:var(--accent);font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .altsep .btn{align-self:flex-start;margin-top:6px}
 #altWrap{scroll-margin-top:220px}
-@media (min-width:861px){#altWrap{scroll-margin-top:120px}}
+@media (min-width:861px){#altWrap{scroll-margin-top:calc(var(--fh,120px) + 12px)}}
 .altsep{display:flex;flex-direction:column;gap:4px;margin-block:14px 2px;padding-top:16px;border-top:3px double var(--ink)}
 .altsep h3{margin:0;font-family:var(--f-display);font-size:24px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;line-height:1.05;text-wrap:balance}
 .altsep p{margin:0;font-size:13px;color:var(--muted);max-width:68ch}
@@ -234,6 +231,8 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
   .item .left{grid-column:1/2} .item .mid{grid-column:1/-1;order:3} .item .buy{grid-column:2/3;grid-row:1}
   .finder-row{grid-template-columns:repeat(3,minmax(0,1fr))}
   .finder-row .q{grid-column:1/-1}
+  .finder{position:static}
+  #altWrap{scroll-margin-top:16px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -257,6 +256,13 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
       <div class="fld q"><label for="q">Search brand, model or size</label><input type="search" id="q" placeholder="e.g. Michelin 225/65R17, 225/65/17, 31x10.50R15" autocomplete="off"></div>
     </div>
     <div class="sidewall">Find your size on the tire sidewall: <b>225</b>/<b>55</b>R<b>17</b> means width 225, ratio 55, rim 17.</div>
+    <div class="finder-row wheel-row">
+      <div class="fld"><label for="whD">Wheel dia.</label><select id="whD" class="sizeSel"></select></div>
+      <div class="fld"><label for="whW">Wheel width</label><select id="whW" class="sizeSel"></select></div>
+      <div class="fld"><label for="whH">Tire height</label><select id="whH" class="sizeSel"></select></div>
+      <div class="fld q"><label for="wq">Rim lookup</label><input type="search" id="wq" placeholder="Your wheel size, e.g. 20x10, 20x9.5, 20x10 35" autocomplete="off"></div>
+    </div>
+    <div class="sidewall">Find your wheel size stamped on the back of the wheel: <b>20</b>x<b>10</b> means 20" across, 10" wide. Shows every tire that mounts on it; add a tire height (33, 35) to narrow it down.</div>
   </div>
 </div>
 
@@ -269,10 +275,6 @@ textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px;ba
     <div class="fgroup"><h3>Minimum tread</h3><div class="seg" id="treadSeg"></div>
       <p class="hint">Measured in 32nds of an inch. New tires are about 10/32. The dashed line marks the 2/32 legal minimum.</p></div>
     <div class="fgroup"><h3>Brand</h3><select id="brand"></select></div>
-    <div class="fgroup"><h3>Wheel size</h3>
-      <div class="wheelrow"><select id="whD" aria-label="Wheel diameter"></select><span>x</span><select id="whW" aria-label="Wheel width"></select></div>
-      <select id="whH" aria-label="Tire height"></select>
-      <p class="hint">Aftermarket wheels? Pick the diameter and width (like 20 x 10) to see every tire that mounts on them. Add a tire height (33", 35") to narrow it down.</p></div>
     <button class="reset" id="reset" type="button">Clear all filters</button>
   </aside>
 
@@ -444,11 +446,25 @@ function fillWheel(){
   for(let w=4;w<=14;w+=0.5){ st.whW=String(w); if(base.some(l=>wheelOk(l))) widths.push(w); }
   st.whW=keep;
   const hs=[...new Set(base.filter(l=>wheelOk(l,'h')).map(l=>{const dm=dims(l.w,l.a,l.r); return dm?Math.round(dm.d):null}).filter(Boolean))].sort((a,b)=>a-b);
-  $('whD').innerHTML=opt(ds,st.whD,'Diameter',v=>v+'"');
-  $('whW').innerHTML=opt(widths,st.whW,'Width',v=>v+'"');
-  $('whH').innerHTML=opt(hs,st.whH,'Any tire height',v=>`About ${v}" tall`);
+  const add=(vals,cur)=>cur!==''&&!vals.some(v=>String(v)===String(cur))?[...vals,+cur].sort((a,b)=>a-b):vals;
+  $('whD').innerHTML=opt(add(ds,st.whD),st.whD,'Any',v=>v+'"');
+  $('whW').innerHTML=opt(add(widths,st.whW),st.whW,'Any',v=>v+'"');
+  $('whH').innerHTML=opt(add(hs,st.whH),st.whH,'Any',v=>v+'"');
 }
-['whD','whW','whH'].forEach(k=>$(k).addEventListener('change',e=>{st[k]=e.target.value; st.shown=40; st.altShown=12; fillWheel(); render();}));
+['whD','whW','whH'].forEach(k=>$(k).addEventListener('change',e=>{st[k]=e.target.value; $('wq').value=''; st.shown=40; st.altShown=12; fillWheel(); render();}));
+// typed rim lookup: "20x10", "20 x 9.5", "20x10 35", "20 10", or just "20"
+function wheelFromText(t){
+  const m=String(t).toLowerCase().match(/(\d{2}(?:\.5)?)(?:\s*(?:x|×|\*|by|\/|-|\s)\s*(\d{1,2}(?:\.\d+)?))?(?:[^\d]+(\d{2}(?:\.\d)?))?/);
+  if(!m) return null;
+  const d=+m[1], w=m[2]!=null?Math.round(+m[2]*2)/2:null, h=m[3]!=null?Math.round(+m[3]):null;
+  if(d<12||d>30) return null;
+  return {d:String(d), w:w!=null&&w>=4&&w<=16?String(w):'', h:h!=null&&h>=20&&h<=45?String(h):''};
+}
+let wqt; $('wq').addEventListener('input',e=>{clearTimeout(wqt); wqt=setTimeout(()=>{
+  const v=e.target.value.trim(), p=v?wheelFromText(v):{d:'',w:'',h:''};
+  if(!p) return;
+  Object.assign(st,{whD:p.d, whW:p.w, whH:p.h, shown:40, altShown:12}); fillWheel(); render();
+},250);});
 
 // size selects (cascading)
 function fillSizes(){
@@ -468,7 +484,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="toAlts"]')){ $('altWrap').scrollIntoView({behavior:'smooth',block:'start'}); }
   if(e.target.closest('[data-act="needAny"]')){ st.need=1; st.shown=40; st.altShown=12; sync(); render(); }
 });
-$('reset').addEventListener('click',()=>{Object.assign(st,{w:'',a:'',r:'',q:'',need:1,cond:'all',tread:0,brand:'',whD:'',whW:'',whH:'',shown:40,altShown:12}); $('q').value=''; $('brand').value=''; fillSizes(); fillWheel(); sync(); render();});
+$('reset').addEventListener('click',()=>{Object.assign(st,{w:'',a:'',r:'',q:'',need:1,cond:'all',tread:0,brand:'',whD:'',whW:'',whH:'',shown:40,altShown:12}); $('q').value=''; $('wq').value=''; $('brand').value=''; fillSizes(); fillWheel(); sync(); render();});
 $('filtToggle').addEventListener('click',()=>$('filters').classList.toggle('open'));
 
 function sync(){
@@ -918,6 +934,8 @@ $('doneClose').addEventListener('click',()=>{ closeCart(); tray(); });
 // start on a realistic view: matched sets of 4, a popular size
 st.need=4;
 fillSizes(); fillWheel(); sync(); render();
+{ const f=document.querySelector('.finder'), set=()=>document.documentElement.style.setProperty('--fh', f.offsetHeight+'px');
+  set(); if(window.ResizeObserver) new ResizeObserver(set).observe(f); }
 
 // ---- Hide tires that were already ordered ----
 // The warehouse Pick List sheet publishes the serial numbers on orders (serials only, no customer details).
