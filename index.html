@@ -483,7 +483,7 @@ function rimRange(dm){
 // a size fits the searched size's rim when its rim range covers the middle of the searched size's range
 function sameRim(ld,td){ const [a,b]=rimRange(td), [c,d]=rimRange(ld), mid=(a+b)/2; return c<=mid && mid<=d; }
 const FIT_PCT = 2.75;  // max difference in overall height, % (taller or shorter)
-const FIT_WMM = Infinity; // no separate tread-width limit; sameRim() keeps widths that mount on the same rim
+const FIT_WMM = 25.5;  // section width within 1" (25 mm) of the searched size, so it suits the same rim (with sameRim)
 // the exact size being looked for, when width, ratio and rim are all known
 function targetSize(sz){
   if(st.w && st.a && st.r) return {w:st.w,a:st.a,r:st.r};
