@@ -495,9 +495,12 @@ function sync(){
 // find a tire size anywhere in the search, in any common format:
 // 225/65R17, 225/65/17, 225-65-17, 225 65 17, 2256517, P225/65R17, LT225/65R17, 225/65ZR17, 225/65 (no rim)
 // flotation: 31x10.50R15, 31x10.5-15, 31x10.50/15, 31x10.50
+// (the end check also lets a trailing period through: "265/60R20.")
 const SIZE_RES = [
-  /(?:^|[^a-z0-9.])(?:p|lt|st|t)?\s*(\d{3})\s*[\/\-\s.]?\s*(\d{2})(?:\s*(?:z?r|[\/\-\s.])?\s*[\-]?\s*(\d{2}(?:\.5)?))?(?:\s*(?:lt|xl|sl))?(?=$|[^0-9.])/i,
-  /(?:^|[^a-z0-9.])(?:lt)?\s*(\d{2})\s*[x\/\-]\s*(\d{1,2}(?:\.\d{1,2})?)(?:\s*(?:z?r|[\/\-\s])?\s*(\d{2}(?:\.5)?))?(?:\s*lt)?(?=$|[^0-9.])/i
+  /(?:^|[^a-z0-9.])(?:p|lt|st|t)?\s*(\d{3})\s*[\/\-\s.]?\s*(\d{2})(?:\s*(?:z?r|[\/\-\s.])?\s*[\-]?\s*(\d{2}(?:\.5)?))?(?:\s*(?:lt|xl|sl))?(?=$|[^0-9.]|\.(?!\d))/i,
+  /(?:^|[^a-z0-9.])(?:lt)?\s*(\d{2})\s*[x\/\-]\s*(\d{1,2}(?:\.\d{1,2})?)(?:\s*(?:z?r|x|[\/\-\s])?\s*(\d{2}(?:\.5)?))?(?:\s*lt)?(?=$|[^0-9.]|\.(?!\d))/i,
+  // flotation typed with spaces only: 35 12.50 20 (needs the decimal and the rim, so "20 10" isn't read as a tire)
+  /(?:^|[^a-z0-9.])(?:lt)?\s*(\d{2})\s+(\d{1,2}\.\d{1,2})\s*(?:z?r|[\/\-\s])\s*(\d{2}(?:\.5)?)(?:\s*lt)?(?=$|[^0-9.]|\.(?!\d))/i
 ];
 function sizeFromQuery(q){
   for(const re of SIZE_RES){
@@ -515,16 +518,17 @@ function okGroups(l){ return l.groups.filter(([t])=> st.tread===0 || (t!=null &&
 function dims(w,a,r){
   const ws=String(w).toLowerCase(), R=parseFloat(r), A=parseFloat(a), W=parseFloat(ws);
   if(isNaN(R)||isNaN(A)||isNaN(W)) return null;
-  if(ws.endsWith('x') || (W<50 && A<25)) return {d:W, wmm:A*25.4, asp:60};  // flotation: 31x10.50R15 (rims like a 60-series LT)
+  if(ws.endsWith('x') || (W<50 && A<25)) return {d:W, wmm:A*25.4, asp:60, flot:true};  // flotation: 31x10.50R15
   if(W>=100 && A>=25 && A<=95) return {d:R+2*W*A/100/25.4, wmm:W, asp:A};  // metric: 225/65R17
   return null;
 }
 // approved rim width range (inches) for a size, from its section width and aspect ratio
 // (matches the published ranges: 265/60R20 7-9", 35x12.50R20 8.5-11", 225/45R17 7-8.5")
 function rimRange(dm){
-  const W=dm.wmm/25.4, a=dm.asp, h=x=>Math.round(x*2)/2;
-  const t = a>=67.5?[.65,.85]: a>=57.5?[.67,.87]: a>=52.5?[.68,.90]: a>=47.5?[.72,.92]: a>=42.5?[.78,.96]: a>=37.5?[.83,1.0]:[.85,1.02];
-  return [h(W*t[0]), h(W*t[1])];
+  // rounded inward to the half inch (min up, max down), so a range never claims more than it should
+  const W=dm.wmm/25.4, a=dm.asp, lo=x=>Math.ceil(x*2-0.1)/2, hi=x=>Math.floor(x*2+0.1)/2;
+  const t = dm.flot?[.67,.88]: a>=67.5?[.65,.85]: a>=57.5?[.67,.87]: a>=52.5?[.68,.90]: a>=47.5?[.72,.92]: a>=42.5?[.78,.96]: a>=37.5?[.83,1.0]:[.85,1.02];
+  return [lo(W*t[0]), hi(W*t[1])];
 }
 // a size fits the searched size's rim when its rim range covers the middle of the searched size's range
 function sameRim(ld,td){ const [a,b]=rimRange(td), [c,d]=rimRange(ld), mid=(a+b)/2; return c<=mid && mid<=d; }
@@ -538,7 +542,7 @@ function targetSize(sz){
 }
 function filtered(){
   const qs = st.q.toLowerCase(); const sz = sizeFromQuery(qs);
-  const terms = (sz ? sz.rest : qs).split(/\s+/).filter(Boolean);
+  const terms = (sz ? sz.rest : qs).split(/\s+/).filter(t=>/[a-z0-9]/i.test(t)); // ignore stray punctuation
   const tgt = targetSize(sz); const td = tgt && dims(tgt.w,tgt.a,tgt.r);
   const out=[], alts=[], altNeed=new Set();
   for(const l of L){
