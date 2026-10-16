@@ -408,7 +408,7 @@ $('stock').innerHTML = `<b>${totalTires.toLocaleString()}</b> tires in stock · 
 stockLine();
 { const map = 'https://maps.google.com/?q='+encodeURIComponent(SHOP.pickup);
   $('contact').innerHTML = SHOP.note + `<div class="info">
-    <div><span class="k">Order</span><span>Call or text <a href="tel:${SHOP.phone.replace(/[^\d+]/g,'')}">${SHOP.phone}</a></span><span>Email <a href="mailto:${SHOP.email}">${SHOP.email}</a></span></div>
+    <div><span class="k">Contact information</span><span>Call or text <a href="tel:${SHOP.phone.replace(/[^\d+]/g,'')}">${SHOP.phone}</a></span><span>Email <a href="mailto:${SHOP.email}">${SHOP.email}</a></span></div>
     <div><span class="k">Hours</span><span class="hrs">${SHOP.hours.map(([d,h])=>`<span>${d}</span><span>${h}</span>`).join('')}</span><span class="sub">${SHOP.hoursNote}</span></div>
     <div><span class="k">Pickup</span><a href="${map}" target="_blank" rel="noopener">${SHOP.pickup}</a><span class="sub">${SHOP.service}</span></div>
     <div><span class="k">Exchanges</span><span>${SHOP.policy}</span></div></div>`;
