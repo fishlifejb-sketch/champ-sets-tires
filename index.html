@@ -724,7 +724,8 @@ $('alts').addEventListener('click',onListClick);
 // Retail customer ID: each store's own discount (set in the Customers sheet, 10% if blank),
 // checked privately by a Netlify function (IDs never appear in this page)
 const cust={id:'',name:'',ok:false,pct:10,rep:''};
-const dp=v=>v==null?null:(cust.ok?Math.round(v*(1-cust.pct/100)*100)/100:v);
+const disc=()=>cust.ok&&cust.pct>0; // a customer ID can carry 0% (rep tracking, saved details, no discount)
+const dp=v=>v==null?null:(disc()?Math.round(v*(1-cust.pct/100)*100)/100:v);
 function quoteLines(){
   const lines=[];
   for(const [k,q] of quote){ const [i,tr]=k.split('|'); const l=L[+i]; const t = tr==='null'?null:+tr;
@@ -756,12 +757,12 @@ function orderText(shop){
   const name=$('cName').value.trim(), phone=$('cPhone').value.trim(), note=$('cNote').value.trim(), addr=$('cAddr').value.trim();
   const biz=$('cBiz').value.trim(), po=$('cPO').value.trim(), slot=$('cTime').value;
   const del=fulfill==='Delivery';
-  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, `Confirmation code: ${orderCode()}`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, slot?`${del?'Delivery':'Pickup'} time: ${slot}`:null, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}, ${cust.pct}% off`:null, shop&&cust.ok&&cust.rep?`Sales rep: ${cust.rep}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
+  return [`NEW TIRE ORDER (${del?'DELIVERY':'PICKUP'})`, `Confirmation code: ${orderCode()}`, ``, biz?`Business: ${biz}`:null, `Name: ${name}`, `Phone: ${phone}`, slot?`${del?'Delivery':'Pickup'} time: ${slot}`:null, po?`PO #: ${po}`:null, cust.ok?`Customer ID: ${cust.id}${cust.name?` (${cust.name})`:''}${disc()?`, ${cust.pct}% off`:''}`:null, shop&&cust.ok&&cust.rep?`Sales rep: ${cust.rep}`:null, del?`Deliver to: ${addr}`:null, note?`Note: ${note}`:null, ``,
     ...lines.flatMap((x,i)=>[
       `${i+1}) ${x.q} x ${x.l.brand} ${x.l.model}`,
-      `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}${cust.ok?` (was ${money(x.orig)})`:''}`,
+      `   Size: ${sizeLine(x)}  |  ${treadLine(x)}  |  ${money(x.sum)}${disc()?` (was ${money(x.orig)})`:''}`,
       `   Serial #s: ${x.picks.map(p=>p[0].replace(/\s+/g,'')+(shop&&p[2]?` (Bay NC-${p[2]})`:'')).join(', ')}`, ``]),
-    `TOTAL: ${n} tire${n>1?'s':''}, ${money(tot)} before tax${cust.ok?` (${cust.pct}% customer discount applied)`:''}`, !del&&SHOP.pickup?`Pickup: ${SHOP.pickup}`:null].filter(v=>v!==null).join('\n');
+    `TOTAL: ${n} tire${n>1?'s':''}, ${money(tot)} before tax${disc()?` (${cust.pct}% customer discount applied)`:''}`, !del&&SHOP.pickup?`Pickup: ${SHOP.pickup}`:null].filter(v=>v!==null).join('\n');
 }
 // one entry per tire, for the warehouse pick list (Google Sheet fed by Netlify's webhook)
 function pickList(lines){
@@ -773,13 +774,13 @@ function drawCart(){
   const lines=quoteLines(); const n=lines.reduce((s,x)=>s+x.q,0); const tot=lines.reduce((s,x)=>s+x.sum,0);
   $('coLines').innerHTML = lines.map(x=>`<div class="cline">
       <div><div class="sz">${x.l.size}</div><div class="nm">${x.q} × ${x.l.brand} ${x.l.model}</div><div class="sub">${x.l.ls?x.l.ls+' · ':''}${treadLine(x)} · ${money(x.sum/x.q)} each</div></div>
-      <div class="amt">${cust.ok?`<s>${money(x.orig)}</s>`:''}${money(x.sum)}</div>
+      <div class="amt">${disc()?`<s>${money(x.orig)}</s>`:''}${money(x.sum)}</div>
       <div class="ids">Serial #s: ${x.picks.map(p=>p[0]).join(', ')}</div>
       <button class="x" type="button" data-k="${x.k}">Remove</button></div>`).join('');
   $('coCount').textContent = `${n} tire${n>1?'s':''}`;
   $('coTotal').textContent = money(tot);
   const save=lines.reduce((s,x)=>s+x.orig,0)-tot;
-  $('coDisc').hidden=!cust.ok; $('coDiscAmt').textContent='−'+money(save); $('coDiscLbl').textContent=`Customer discount (${cust.pct}%)`;
+  $('coDisc').hidden=!disc(); $('coDiscAmt').textContent='−'+money(save); $('coDiscLbl').textContent=`Customer discount (${cust.pct}%)`;
   $('copyTo').textContent = SHOP.phone;
   textHref();
 }
@@ -793,7 +794,7 @@ $('openCart').addEventListener('click',openCart);
 function custUI(){
   $('custShow').hidden=cust.ok || !$('custRow').hidden;
   $('custOk').hidden=!cust.ok;
-  if(cust.ok){ $('custRow').hidden=true; $('custOk').innerHTML=`✓ Customer ID ${escA(cust.id)}${cust.name?` (${escA(cust.name)})`:''}: ${cust.pct}% off applied <button type="button" class="linkbtn" id="custRemove">Remove</button>`; }
+  if(cust.ok){ $('custRow').hidden=true; $('custOk').innerHTML=`✓ Customer ID ${escA(cust.id)}${cust.name?` (${escA(cust.name)})`:''}${disc()?`: ${cust.pct}% off applied`:' applied'} <button type="button" class="linkbtn" id="custRemove">Remove</button>`; }
   tray(); if(!$('co').hidden) drawCart();
 }
 async function applyCust(code, quiet){
@@ -803,7 +804,7 @@ async function applyCust(code, quiet){
     const r=await fetch('/.netlify/functions/customer-id?id='+encodeURIComponent(code),{cache:'no-store'});
     const d=await r.json();
     if(d.ok){
-      const pct=Number(d.pct); Object.assign(cust,{id:code,name:d.name||'',ok:true,pct:(pct>0&&pct<=50)?pct:10,rep:d.rep||''});
+      const pct=Number(d.pct); Object.assign(cust,{id:code,name:d.name||'',ok:true,pct:(d.pct!=null&&d.pct!==''&&isFinite(pct)&&pct>=0&&pct<=50)?pct:10,rep:d.rep||''});
       try{ localStorage.setItem('custId',code); }catch(_){}
       // fill in the store's saved details (only into empty boxes, so nothing typed gets overwritten)
       const fill=(id,v)=>{ if(v && !$(id).value.trim()){ $(id).value=v; $(id).classList.remove('bad'); } };

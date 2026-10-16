@@ -6,10 +6,11 @@ let cache = { at: 0, map: null };
 const DEFAULT_PCT = 10;
 const MAX_PCT = 50; // guards against a typo like 100 giving tires away
 
-// "15", "15%", " 12.5 " -> 15 / 12.5; blank or unreadable -> 10; capped at 50
+// "15", "15%", " 12.5 " -> 15 / 12.5; "0" -> 0 (ID with no discount); blank or unreadable -> 10; capped at 50
 export function readPct(v) {
   const n = parseFloat(String(v == null ? '' : v).replace('%', '').trim());
-  if (!isFinite(n) || n <= 0) return DEFAULT_PCT;
+  if (!isFinite(n) || n < 0) return DEFAULT_PCT;
+  if (n === 0) return 0;
   return Math.min(n < 1 ? n * 100 : n, MAX_PCT);
 }
 

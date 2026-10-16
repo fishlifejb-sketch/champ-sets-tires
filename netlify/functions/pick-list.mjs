@@ -24,10 +24,10 @@ export default {
     if (data.custid) {
       // Re-check the customer ID here so a made-up ID can't slip a discount past the warehouse.
       const c = (await loadCustomers()).get(String(data.custid).trim().toUpperCase());
-      const used = Number(data.custpct) || 10;
+      const raw = Number(data.custpct), used = String(data.custpct ?? '') !== '' && isFinite(raw) ? raw : 10;
       if (!c) tags.push(`ID ${data.custid} NOT VALID, CHECK PRICES`);
       else if (Math.abs(c.pct - used) > 0.001) tags.push(`ID ${data.custid} ${used}% APPLIED BUT SHEET SAYS ${c.pct}%, CHECK PRICES`);
-      else tags.push(`ID ${data.custid} ${used}% OFF`);
+      else tags.push(used > 0 ? `ID ${data.custid} ${used}% OFF` : `ID ${data.custid}`);  // 0%: just the ID, no discount wording
       if (c && c.rep) tags.push(`REP ${c.rep}`);
     }
     if (data.note) tags.push(data.note);
